@@ -1,0 +1,268 @@
+'use strict';
+const { createClient } = require('@libsql/client');
+const path = require('path');
+const fs = require('fs');
+const bcrypt = require('bcryptjs');
+
+const DB_PATH = process.env.DB_PATH || './data/fuelbunk.db';
+const isMemory = DB_PATH === ':memory:';
+if (!isMemory) fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true });
+
+const client = createClient({ url: isMemory ? ':memory:' : `file:${path.resolve(DB_PATH)}` });
+
+function rowToObj(row, columns) {
+  const obj = {};
+  columns.forEach((col, i) => { obj[col] = row[i] !== undefined ? row[i] : null; });
+  return obj;
+}
+
+const db = {
+  _client: client,
+  async run(sql, params = []) {
+    const result = await client.execute({ sql, args: params });
+    return { lastInsertRowid: Number(result.lastInsertRowid), changes: result.rowsAffected };
+  },
+  async get(sql, params = []) {
+    const result = await client.execute({ sql, args: params });
+    return result.rows[0] ? rowToObj(result.rows[0], result.columns) : null;
+  },
+  async all(sql, params = []) {
+    const result = await client.execute({ sql, args: params });
+    return result.rows.map(row => rowToObj(row, result.columns));
+  },
+  async transaction(fn) {
+    await client.execute('BEGIN');
+    try { const r = await fn(db); await client.execute('COMMIT'); return r; }
+    catch(e) { await client.execute('ROLLBACK'); throw e; }
+  },
+  async logAudit(stationId, userId, username, action, resource, resourceId, oldVal, newVal, ip, ua, status='success') {
+    try {
+      await this.run(
+        `INSERT INTO audit_log (station_id,user_id,username,action,resource,resource_id,old_values,new_values,ip_address,user_agent,status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        [stationId,userId,username,action,resource,resourceId,
+          oldVal?JSON.stringify(oldVal):null, newVal?JSON.stringify(newVal):null, ip, ua, status]
+      );
+    } catch {}
+  },
+  generateInvoiceNo(stationCode='FB') {
+    const n = new Date();
+    return `${stationCode}${n.getFullYear().toString().slice(-2)}${String(n.getMonth()+1).padStart(2,'0')}${Math.floor(Math.random()*900000)+100000}`;
+  }
+};
+
+async function initSchema() {
+  const tables = [
+    // ── STATIONS (multi-tenant core) ─────────────────────────
+    `CREATE TABLE IF NOT EXISTS stations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      station_name TEXT NOT NULL,
+      gstin TEXT, address TEXT, mobile TEXT, email TEXT,
+      ms_price REAL NOT NULL DEFAULT 102.00,
+      hsd_price REAL NOT NULL DEFAULT 90.00,
+      cng_price REAL NOT NULL DEFAULT 85.00,
+      idle_timeout INTEGER NOT NULL DEFAULT 15,
+      plan TEXT NOT NULL DEFAULT 'trial' CHECK(plan IN ('trial','basic','pro','enterprise')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      trial_ends_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    // ── SUPER ADMINS ──────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS super_admins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_login TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    // ── USERS (per station) ───────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      username TEXT NOT NULL COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('owner','manager','cashier','attendant')),
+      mobile TEXT, is_active INTEGER NOT NULL DEFAULT 1,
+      last_login TEXT, failed_logins INTEGER NOT NULL DEFAULT 0, locked_until TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(station_id, username)
+    )`,
+    `CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER, super_admin_id INTEGER,
+      station_id INTEGER,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL, ip_address TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER, user_id INTEGER, username TEXT,
+      action TEXT NOT NULL, resource TEXT, resource_id INTEGER,
+      old_values TEXT, new_values TEXT, ip_address TEXT, user_agent TEXT,
+      status TEXT NOT NULL DEFAULT 'success',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS tanks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_name TEXT NOT NULL, fuel_type TEXT NOT NULL CHECK(fuel_type IN ('MS','HSD','CNG')),
+      capacity REAL NOT NULL, current_stock REAL NOT NULL DEFAULT 0,
+      min_alert REAL NOT NULL DEFAULT 2000, is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS nozzles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_id INTEGER NOT NULL REFERENCES tanks(id),
+      nozzle_name TEXT NOT NULL, last_reading REAL NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS employees (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      user_id INTEGER, emp_code TEXT,
+      full_name TEXT NOT NULL, role TEXT NOT NULL,
+      mobile TEXT, salary REAL NOT NULL DEFAULT 0,
+      join_date TEXT, is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(station_id, emp_code)
+    )`,
+    `CREATE TABLE IF NOT EXISTS shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      shift_name TEXT NOT NULL, employee_id INTEGER,
+      opened_by INTEGER NOT NULL, closed_by INTEGER,
+      open_time TEXT NOT NULL DEFAULT (datetime('now')), close_time TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
+      opening_readings TEXT NOT NULL DEFAULT '{}', closing_readings TEXT DEFAULT '{}',
+      total_sales REAL DEFAULT 0, cash_collected REAL DEFAULT 0,
+      upi_collected REAL DEFAULT 0, card_collected REAL DEFAULT 0,
+      credit_sales REAL DEFAULT 0, cash_physical REAL DEFAULT 0,
+      cash_variance REAL DEFAULT 0, notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS credit_customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      company_name TEXT NOT NULL, contact_name TEXT,
+      mobile TEXT, email TEXT, gstin TEXT, address TEXT,
+      credit_limit REAL NOT NULL DEFAULT 0, outstanding REAL NOT NULL DEFAULT 0,
+      billing_cycle TEXT NOT NULL DEFAULT 'monthly', is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS credit_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      customer_id INTEGER NOT NULL, amount REAL NOT NULL,
+      payment_mode TEXT NOT NULL, reference_no TEXT, notes TEXT,
+      received_by INTEGER, payment_date TEXT NOT NULL DEFAULT (date('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS suppliers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, gstin TEXT, mobile TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_id INTEGER NOT NULL, supplier_id INTEGER, invoice_no TEXT,
+      quantity REAL NOT NULL, rate REAL NOT NULL, amount REAL NOT NULL,
+      density REAL, gst_rate REAL DEFAULT 0, gst_amount REAL DEFAULT 0,
+      total_amount REAL NOT NULL, purchase_date TEXT NOT NULL DEFAULT (date('now')),
+      received_by INTEGER, notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS dip_readings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_id INTEGER NOT NULL, shift_id INTEGER,
+      dip_mm REAL, calculated_litres REAL NOT NULL, actual_stock REAL NOT NULL,
+      variance REAL DEFAULT 0, reading_type TEXT NOT NULL DEFAULT 'manual',
+      taken_by INTEGER, reading_time TEXT NOT NULL DEFAULT (datetime('now')), notes TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      invoice_no TEXT NOT NULL, shift_id INTEGER NOT NULL,
+      nozzle_id INTEGER, tank_id INTEGER, fuel_type TEXT NOT NULL,
+      quantity REAL NOT NULL, rate REAL NOT NULL, amount REAL NOT NULL,
+      gst_rate REAL NOT NULL DEFAULT 0, gst_amount REAL NOT NULL DEFAULT 0,
+      total_amount REAL NOT NULL, payment_mode TEXT NOT NULL,
+      upi_ref TEXT, customer_id INTEGER, vehicle_no TEXT,
+      served_by INTEGER, is_cancelled INTEGER NOT NULL DEFAULT 0,
+      cancel_reason TEXT, sale_time TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(station_id, invoice_no)
+    )`,
+    `CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      product_code TEXT, product_name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'lubricant', hsn_code TEXT,
+      unit TEXT NOT NULL DEFAULT 'litre', mrp REAL NOT NULL DEFAULT 0,
+      sale_price REAL NOT NULL DEFAULT 0, gst_rate REAL NOT NULL DEFAULT 18,
+      stock_qty REAL NOT NULL DEFAULT 0, min_stock REAL NOT NULL DEFAULT 5,
+      expiry_date TEXT, is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    // Indexes
+    `CREATE INDEX IF NOT EXISTS idx_sales_station ON sales(station_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sales_time ON sales(sale_time)`,
+    `CREATE INDEX IF NOT EXISTS idx_shifts_station ON shifts(station_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_shifts_status ON shifts(station_id,status)`,
+    `CREATE INDEX IF NOT EXISTS idx_users_station ON users(station_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_tanks_station ON tanks(station_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_station ON audit_log(station_id)`,
+  ];
+  for (const s of tables) {
+    await client.execute(s).catch(e => { if(!e.message?.includes('already exists')) console.warn('[DB]',e.message?.substring(0,60)); });
+  }
+}
+
+async function seedInitialData() {
+  const sa = await db.get('SELECT id FROM super_admins LIMIT 1');
+  if (sa) return;
+  const hash = bcrypt.hashSync(process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin@123', 12);
+  await db.run('INSERT INTO super_admins (username,password_hash,full_name) VALUES (?,?,?)',
+    [process.env.SUPER_ADMIN_USERNAME || 'superadmin', hash, 'Super Administrator']);
+
+  // Demo station
+  await db.run(`INSERT INTO stations (station_code,station_name,ms_price,hsd_price,cng_price,plan,trial_ends_at) VALUES (?,?,102,90,85,'trial',date('now','+30 days'))`,
+    ['DEMO01','Demo Fuel Station']);
+  const station = await db.get('SELECT id FROM stations WHERE station_code=?',['DEMO01']);
+  const ownerHash = bcrypt.hashSync('Demo@12345', 12);
+  await db.run('INSERT INTO users (station_id,username,password_hash,full_name,role) VALUES (?,?,?,?,?)',
+    [station.id,'demo','$2a$12$'+ownerHash.slice(7),'Demo Owner','owner']);
+  // fix: just use the hash directly
+  await db.run('UPDATE users SET password_hash=? WHERE station_id=? AND username=?',
+    [bcrypt.hashSync('Demo@12345',12), station.id, 'demo']);
+  await db.run('INSERT INTO tanks (station_id,tank_name,fuel_type,capacity,current_stock,min_alert) VALUES (?,?,?,?,?,?)',[station.id,'MS Tank 1','MS',20000,8000,2000]);
+  await db.run('INSERT INTO tanks (station_id,tank_name,fuel_type,capacity,current_stock,min_alert) VALUES (?,?,?,?,?,?)',[station.id,'HSD Tank 1','HSD',20000,6000,2000]);
+  const t1=await db.get('SELECT id FROM tanks WHERE station_id=? AND fuel_type=?',[station.id,'MS']);
+  const t2=await db.get('SELECT id FROM tanks WHERE station_id=? AND fuel_type=?',[station.id,'HSD']);
+  if(t1){ await db.run('INSERT INTO nozzles (station_id,tank_id,nozzle_name) VALUES (?,?,?)',[station.id,t1.id,'MS-1']); await db.run('INSERT INTO nozzles (station_id,tank_id,nozzle_name) VALUES (?,?,?)',[station.id,t1.id,'MS-2']); }
+  if(t2){ await db.run('INSERT INTO nozzles (station_id,tank_id,nozzle_name) VALUES (?,?,?)',[station.id,t2.id,'HSD-1']); }
+  await db.run('INSERT INTO suppliers (station_id,name,mobile) VALUES (?,?,?)',[station.id,'HPCL Depot','9000000001']);
+  console.log('[DB] Seeded: superadmin + DEMO01 station');
+}
+
+let _ready = null;
+db.ready = function() {
+  if (!_ready) _ready = initSchema().then(seedInitialData).catch(console.error);
+  return _ready;
+};
+
+module.exports = db;

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>FuelBunk Pro</title>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#1a1f2e"/>
+<style>
+:root{--bg:#0f1117;--surface:#1a1f2e;--surface2:#232838;--border:#2d3348;--accent:#f97316;--accent2:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--text:#f1f5f9;--muted:#94a3b8;--radius:12px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
+.hidden{display:none!important}
+/* ── AUTH SCREENS ── */
+#authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#0f1117 0%,#1a1f2e 100%)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:440px;box-shadow:0 25px 50px rgba(0,0,0,.5)}
+.auth-logo{text-align:center;margin-bottom:32px}
+.auth-logo .icon{font-size:48px;margin-bottom:8px}
+.auth-logo h1{font-size:24px;font-weight:700;color:var(--accent)}
+.auth-logo p{color:var(--muted);font-size:13px;margin-top:4px}
+.tab-bar{display:flex;background:var(--surface2);border-radius:10px;padding:4px;margin-bottom:28px;gap:4px}
+.tab-btn{flex:1;padding:8px;border:none;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
+.tab-btn.active{background:var(--accent);color:#fff}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;margin-top:4px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#ea6c0f}
+.btn-secondary{background:var(--accent2);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.alert{padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:16px;display:none}
+.alert.error{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
+.alert.success{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
+.divider{text-align:center;color:var(--muted);font-size:12px;margin:20px 0;position:relative}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+.divider::before{left:0}.divider::after{right:0}
+/* ── MAIN APP ── */
+#app{display:none;flex-direction:column;min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{font-weight:700;font-size:16px;color:var(--accent)}
+.station-badge{background:var(--accent2);color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.idle-bar{height:3px;background:var(--border);position:relative;overflow:hidden}
+.idle-progress{height:100%;background:var(--accent);transition:width 1s linear;width:100%}
+.main-content{flex:1;padding:16px;padding-bottom:80px;max-width:768px;margin:0 auto;width:100%}
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;height:64px;z-index:100}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:10px;font-weight:500;transition:.2s;padding:8px 0}
+.nav-item.active{color:var(--accent)}
+.nav-item svg{width:22px;height:22px}
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.card-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat-card{background:var(--surface2);border-radius:10px;padding:14px}
+.stat-value{font-size:22px;font-weight:700;color:var(--accent)}
+.stat-label{font-size:11px;color:var(--muted);margin-top:2px}
+.tank-bar{background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:8px}
+.tank-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.tank-name{font-size:13px;font-weight:600}
+.tank-pct{font-size:12px;color:var(--muted)}
+.progress-track{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:.6s}
+.fuel-ms{background:linear-gradient(90deg,#22c55e,#16a34a)}
+.fuel-hsd{background:linear-gradient(90deg,#3b82f6,#1d4ed8)}
+.fuel-cng{background:linear-gradient(90deg,#f97316,#ea580c)}
+/* ── SALE FORM ── */
+.fuel-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.fuel-btn{padding:14px 8px;border:2px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);cursor:pointer;text-align:center;font-weight:600;transition:.2s}
+.fuel-btn.selected{border-color:var(--accent);background:rgba(249,115,22,.1)}
+.fuel-btn .fuel-price{font-size:11px;color:var(--muted);margin-top:2px}
+.amount-display{background:var(--surface2);border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}
+.amount-display .rupee{font-size:36px;font-weight:700;color:var(--accent)}
+.amount-display .litres{font-size:13px;color:var(--muted);margin-top:4px}
+.keypad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.key{padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;cursor:pointer;text-align:center;transition:.1s}
+.key:active{background:var(--border);transform:scale(.95)}
+.key.key-0{grid-column:span 2}
+.key.key-del{background:rgba(239,68,68,.15);color:var(--red)}
+.pay-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.pay-btn{padding:12px 6px;border:2px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);cursor:pointer;text-align:center;font-size:12px;font-weight:600;transition:.2s}
+.pay-btn.selected{border-color:var(--green);background:rgba(34,197,94,.1);color:var(--green)}
+.mode-toggle{display:flex;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:12px;gap:3px}
+.mode-btn{flex:1;padding:8px;border:none;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:.2s}
+.mode-btn.active{background:var(--surface);color:var(--text)}
+/* ── LISTS ── */
+.list-item{background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.list-item-left{flex:1}
+.list-item-title{font-size:14px;font-weight:600}
+.list-item-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase}
+.badge-ms{background:rgba(34,197,94,.2);color:#4ade80}
+.badge-hsd{background:rgba(59,130,246,.2);color:#93c5fd}
+.badge-cash{background:rgba(234,179,8,.2);color:#fbbf24}
+.badge-upi{background:rgba(139,92,246,.2);color:#c4b5fd}
+.badge-credit{background:rgba(239,68,68,.2);color:#fca5a5}
+/* ── SUPER ADMIN ── */
+.sa-badge{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.station-row{background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px}
+.station-row-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.plan-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.plan-trial{background:rgba(234,179,8,.2);color:#fbbf24}
+.plan-basic{background:rgba(59,130,246,.2);color:#93c5fd}
+.plan-pro{background:rgba(34,197,94,.2);color:#4ade80}
+.plan-enterprise{background:rgba(249,115,22,.2);color:#fdba74}
+.active-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px}
+.inactive-dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;margin-right:4px}
+/* ── MISC ── */
+.section-title{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.fab{position:fixed;bottom:76px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(249,115,22,.4);z-index:90}
+input,select,textarea{font-family:inherit}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:40px auto;display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 20px;font-size:13px;font-weight:500;z-index:999;transition:.3s;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:#fca5a5}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon">⛽</div>
+      <h1>FuelBunk Pro</h1>
+      <p>Multi-Station Management Platform</p>
+    </div>
+    <div id="authAlert" class="alert"></div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchAuthTab('login')">Login</button>
+      <button class="tab-btn" onclick="switchAuthTab('register')">Register Station</button>
+      <button class="tab-btn" onclick="switchAuthTab('super')">Super Admin</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm">
+      <div class="form-group">
+        <label>Station Code</label>
+        <input id="loginStation" type="text" placeholder="e.g. DEMO01" autocomplete="off" style="text-transform:uppercase"/>
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="loginUser" type="text" placeholder="Username" autocomplete="username"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password"/>
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">Login →</button>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" class="hidden">
+      <div class="form-group">
+        <label>Station Code <span style="color:var(--muted);font-size:10px">(4-10 chars, A-Z 0-9)</span></label>
+        <input id="regCode" type="text" placeholder="e.g. HPCL001" style="text-transform:uppercase" maxlength="10"/>
+      </div>
+      <div class="form-group">
+        <label>Station Name</label>
+        <input id="regName" type="text" placeholder="e.g. Sharma Filling Station"/>
+      </div>
+      <div class="form-group">
+        <label>Owner Username</label>
+        <input id="regUser" type="text" placeholder="Min 4 characters"/>
+      </div>
+      <div class="form-group">
+        <label>Owner Password <span style="color:var(--muted);font-size:10px">(Upper+Lower+Number+Special)</span></label>
+        <input id="regPass" type="password" placeholder="Min 8 chars"/>
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input id="regFullName" type="text" placeholder="Owner's full name"/>
+      </div>
+      <div class="form-group">
+        <label>Mobile</label>
+        <input id="regMobile" type="tel" placeholder="10-digit mobile"/>
+      </div>
+      <button class="btn btn-secondary" onclick="doRegister()">Register & Start Free Trial →</button>
+      <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:12px">✓ 30-day free trial • No credit card needed</p>
+    </div>
+
+    <!-- Super Admin Form -->
+    <div id="superForm" class="hidden">
+      <div style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#c4b5fd">
+        🛡️ Super Admin access — manages all stations
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="saUser" type="text" placeholder="superadmin"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="saPass" type="password" placeholder="Password"/>
+      </div>
+      <button class="btn btn-outline" style="border-color:#7c3aed;color:#c4b5fd" onclick="doSuperLogin()">Super Admin Login →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="idle-bar"><div class="idle-progress" id="idleBar"></div></div>
+  <div class="topbar">
+    <div class="topbar-left">
+      <span style="font-size:20px">⛽</span>
+      <span class="topbar-logo">FuelBunk Pro</span>
+      <span id="stationBadge" class="station-badge"></span>
+    </div>
+    <div class="topbar-right">
+      <span id="userBadge" style="font-size:12px;color:var(--muted)"></span>
+      <button onclick="doLogout()" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:20px">⏻</button>
+    </div>
+  </div>
+  <div class="main-content" id="mainContent"></div>
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" onclick="navigate('dashboard')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="navigate('sale')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      Quick Sale
+    </button>
+    <button class="nav-item" onclick="navigate('shifts')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Shifts
+    </button>
+    <button class="nav-item" onclick="navigate('stock')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Stock
+    </button>
+    <button class="nav-item" onclick="navigate('more')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      More
+    </button>
+  </nav>
+</div>
+
+<!-- SUPER ADMIN PANEL -->
+<div id="superApp" style="display:none;flex-direction:column;min-height:100vh">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span style="font-size:20px">🛡️</span>
+      <span class="topbar-logo">FuelBunk Pro</span>
+      <span class="sa-badge">SUPER ADMIN</span>
+    </div>
+    <div class="topbar-right">
+      <button onclick="doLogout()" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:20px">⏻</button>
+    </div>
+  </div>
+  <div style="padding:16px;max-width:900px;margin:0 auto;width:100%" id="superContent"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let accessToken = '', refreshToken = '', currentUser = null, currentStation = null, isSuperAdmin = false;
+let currentTab = 'dashboard';
+let idleTimer = null, idleTimeout = 15 * 60, idleRemaining = idleTimeout;
+let currentFuel = 'MS', currentPayMode = 'cash', entryMode = 'amount', entryValue = '';
+let shiftId = null, nozzles = [], tanks = [], customers = [];
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.onload = async () => {
+  const t = sessionStorage.getItem('access_token');
+  const r = sessionStorage.getItem('refresh_token');
+  const sa = sessionStorage.getItem('is_super_admin');
+  if (t) {
+    accessToken = t; refreshToken = r;
+    if (sa === 'true') { isSuperAdmin = true; await resumeSuperAdmin(); }
+    else await resumeSession();
+  }
+};
+
+async function apiFetch(path, opts = {}) {
+  opts.headers = { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...opts.headers };
+  if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
+  let res = await fetch(API + path, opts);
+  if (res.status === 401 && refreshToken) {
+    const r2 = await fetch(API + '/api/auth/refresh', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ refreshToken }) });
+    if (r2.ok) {
+      const d = await r2.json();
+      accessToken = d.accessToken;
+      sessionStorage.setItem('access_token', accessToken);
+      opts.headers.Authorization = `Bearer ${accessToken}`;
+      res = await fetch(API + path, opts);
+    } else { doLogout(); throw new Error('Session expired'); }
+  }
+  return res;
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+function switchAuthTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['login','register','super'][i] === tab));
+  ['loginForm','registerForm','superForm'].forEach((id,i) => document.getElementById(id).classList.toggle('hidden', ['login','register','super'][i] !== tab));
+  document.getElementById('authAlert').className = 'alert';
+}
+
+function showAuthAlert(msg, type='error') {
+  const el = document.getElementById('authAlert');
+  el.textContent = msg; el.className = `alert ${type}`;
+}
+
+async function doLogin() {
+  const station = document.getElementById('loginStation').value.trim().toUpperCase();
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if (!station || !username || !password) return showAuthAlert('Please fill all fields.');
+  try {
+    const res = await fetch(API + '/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ stationCode: station, username, password }) });
+    const data = await res.json();
+    if (!res.ok) return showAuthAlert(data.error || 'Login failed.');
+    accessToken = data.accessToken; refreshToken = data.refreshToken;
+    currentUser = data.user; currentStation = data.station; isSuperAdmin = false;
+    sessionStorage.setItem('access_token', accessToken);
+    sessionStorage.setItem('refresh_token', refreshToken);
+    sessionStorage.setItem('is_super_admin', 'false');
+    showApp();
+  } catch(e) { showAuthAlert('Connection error.'); }
+}
+
+async function doRegister() {
+  const stationCode = document.getElementById('regCode').value.trim().toUpperCase();
+  const stationName = document.getElementById('regName').value.trim();
+  const ownerUsername = document.getElementById('regUser').value.trim();
+  const ownerPassword = document.getElementById('regPass').value;
+  const ownerFullName = document.getElementById('regFullName').value.trim();
+  const mobile = document.getElementById('regMobile').value.trim();
+  if (!stationCode || !stationName || !ownerUsername || !ownerPassword || !ownerFullName) return showAuthAlert('Please fill all required fields.');
+  try {
+    const res = await fetch(API + '/api/auth/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ stationCode, stationName, ownerUsername, ownerPassword, ownerFullName, mobile }) });
+    const data = await res.json();
+    if (!res.ok) return showAuthAlert(data.error || (data.errors?.[0]?.msg) || 'Registration failed.');
+    showAuthAlert(`✓ Station ${stationCode} registered! Login with your credentials.`, 'success');
+    setTimeout(() => { document.getElementById('loginStation').value = stationCode; document.getElementById('loginUser').value = ownerUsername; switchAuthTab('login'); }, 2000);
+  } catch(e) { showAuthAlert('Connection error.'); }
+}
+
+async function doSuperLogin() {
+  const username = document.getElementById('saUser').value.trim();
+  const password = document.getElementById('saPass').value;
+  if (!username || !password) return showAuthAlert('Please fill all fields.');
+  try {
+    const res = await fetch(API + '/api/auth/super/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
+    const data = await res.json();
+    if (!res.ok) return showAuthAlert(data.error || 'Login failed.');
+    accessToken = data.accessToken; refreshToken = data.refreshToken; isSuperAdmin = true;
+    sessionStorage.setItem('access_token', accessToken);
+    sessionStorage.setItem('refresh_token', refreshToken);
+    sessionStorage.setItem('is_super_admin', 'true');
+    currentUser = data.user;
+    showSuperAdmin();
+  } catch(e) { showAuthAlert('Connection error.'); }
+}
+
+async function resumeSession() {
+  try {
+    const res = await apiFetch('/api/auth/me');
+    if (!res.ok) { sessionStorage.clear(); return; }
+    const data = await res.json();
+    currentUser = data.user; currentStation = data.station;
+    showApp();
+  } catch { sessionStorage.clear(); }
+}
+
+async function resumeSuperAdmin() {
+  try {
+    const res = await apiFetch('/api/auth/me');
+    if (!res.ok) { sessionStorage.clear(); return; }
+    currentUser = (await res.json()).user;
+    showSuperAdmin();
+  } catch { sessionStorage.clear(); }
+}
+
+function doLogout() {
+  if (refreshToken) apiFetch('/api/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }).catch(() => {});
+  sessionStorage.clear();
+  accessToken = ''; refreshToken = ''; currentUser = null; currentStation = null; isSuperAdmin = false;
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('superApp').style.display = 'none';
+  clearInterval(idleTimer);
+}
+
+// ── App Init ──────────────────────────────────────────────────────────────
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('superApp').style.display = 'none';
+  document.getElementById('stationBadge').textContent = currentStation?.code || '';
+  document.getElementById('userBadge').textContent = `${currentUser?.role?.toUpperCase()} · ${currentUser?.username}`;
+  idleTimeout = (currentStation?.idleTimeout || 15) * 60;
+  startIdleTimer();
+  navigate('dashboard');
+}
+
+function showSuperAdmin() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('superApp').style.display = 'flex';
+  renderSuperDashboard();
+}
+
+// ── Idle Timer ────────────────────────────────────────────────────────────
+function startIdleTimer() {
+  idleRemaining = idleTimeout;
+  clearInterval(idleTimer);
+  idleTimer = setInterval(() => {
+    idleRemaining--;
+    document.getElementById('idleBar').style.width = (idleRemaining/idleTimeout*100) + '%';
+    if (idleRemaining <= 0) { showToast('Session expired due to inactivity.','error'); doLogout(); }
+  }, 1000);
+  ['touchstart','click','keydown','mousemove'].forEach(e => document.addEventListener(e, resetIdle, { passive: true }));
+}
+function resetIdle() { idleRemaining = idleTimeout; }
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function navigate(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-item').forEach((b,i) => b.classList.toggle('active', ['dashboard','sale','shifts','stock','more'][i] === tab));
+  const c = document.getElementById('mainContent');
+  c.innerHTML = '<div class="spinner"></div>';
+  ({ dashboard: renderDashboard, sale: renderSale, shifts: renderShifts, stock: renderStock, more: renderMore }[tab] || renderDashboard)();
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function renderDashboard() {
+  const res = await apiFetch('/api/dashboard');
+  const { data } = await res.json();
+  const c = document.getElementById('mainContent');
+  const shiftStatus = data.openShift
+    ? `<div class="card" style="border-color:var(--green)"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-weight:700;color:var(--green)">🟢 Shift Open</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${data.openShift.shift_name} • by ${data.openShift.opened_by_name}</div></div><button onclick="navigate('shifts')" style="background:var(--green);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">Manage</button></div></div>`
+    : `<div class="card" style="border-color:var(--yellow)"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-weight:700;color:var(--yellow)">⚠️ No Open Shift</div><div style="font-size:12px;color:var(--muted)">Open a shift to record sales</div></div><button onclick="navigate('shifts')" style="background:var(--yellow);border:none;color:#000;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">Open Shift</button></div></div>`;
+  shiftId = data.openShift?.id || null;
+  c.innerHTML = `
+    ${shiftStatus}
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">₹${(data.todayRevenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">Today's Revenue</div></div>
+      <div class="stat-card"><div class="stat-value">${data.todaySales||0}</div><div class="stat-label">Today's Sales</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tank Levels</div>
+      ${(data.tanks||[]).map(t => {
+        const pct = Math.round((t.current_stock/t.capacity)*100);
+        const cls = t.fuel_type==='MS'?'fuel-ms':t.fuel_type==='HSD'?'fuel-hsd':'fuel-cng';
+        const warn = t.current_stock <= t.min_alert ? '⚠️ ' : '';
+        return `<div class="tank-bar"><div class="tank-header"><span class="tank-name">${warn}${t.tank_name}</span><span class="tank-pct">${t.current_stock.toFixed(0)}L / ${pct}%</span></div><div class="progress-track"><div class="progress-fill ${cls}" style="width:${pct}%"></div></div></div>`;
+      }).join('')}
+    </div>
+    ${data.topCredit?.length ? `<div class="card"><div class="card-title">Outstanding Credit</div>${data.topCredit.map(c=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${c.company_name}</div></div><div style="font-weight:700;color:var(--red)">₹${c.outstanding.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('')}</div>` : ''}
+    <div class="card"><div class="card-title">Recent Sales</div>${(data.recentSales||[]).slice(0,6).map(s=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${s.invoice_no}</div><div class="list-item-sub">${s.fuel_type} · ${s.quantity}L · ${new Date(s.sale_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div></div><div style="text-align:right"><div style="font-weight:700">₹${s.total_amount.toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="badge badge-${s.payment_mode==='cash'?'cash':'upi'}">${s.payment_mode}</div></div></div>`).join('') || '<div class="empty"><div class="empty-icon">📊</div>No sales today</div>'}</div>`;
+}
+
+// ── Quick Sale ─────────────────────────────────────────────────────────────
+async function renderSale() {
+  const [nRes, cRes] = await Promise.all([apiFetch('/api/tanks'), apiFetch('/api/customers')]);
+  tanks = (await nRes.json()).data || [];
+  customers = (await cRes.json()).data || [];
+  if (!shiftId) {
+    const s = await apiFetch('/api/shifts/current');
+    shiftId = (await s.json()).data?.id || null;
+  }
+  entryValue = ''; currentFuel = 'MS'; currentPayMode = 'cash'; entryMode = 'amount';
+  renderSaleUI();
+}
+
+function renderSaleUI() {
+  const prices = { MS: currentStation?.msPrice||102, HSD: currentStation?.hsdPrice||90, CNG: currentStation?.cngPrice||85 };
+  const price = prices[currentFuel] || 100;
+  const qty = entryMode==='litres' ? parseFloat(entryValue||0) : parseFloat(entryValue||0)/price;
+  const amt = entryMode==='amount' ? parseFloat(entryValue||0) : qty*price;
+  document.getElementById('mainContent').innerHTML = `
+    <div class="card-title">Select Fuel</div>
+    <div class="fuel-grid">
+      ${['MS','HSD','CNG'].map(f=>`<button class="fuel-btn ${currentFuel===f?'selected':''}" onclick="selectFuel('${f}')"><div style="font-size:18px">${f==='MS'?'🟢':f==='HSD'?'🔵':'🟠'}</div><div>${f}</div><div class="fuel-price">₹${prices[f]}/L</div></button>`).join('')}
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn ${entryMode==='amount'?'active':''}" onclick="setMode('amount')">₹ Amount</button>
+      <button class="mode-btn ${entryMode==='litres'?'active':''}" onclick="setMode('litres')">⛽ Litres</button>
+    </div>
+    <div class="amount-display">
+      <div class="rupee">${entryMode==='amount'?'₹'+entryValue : '⛽'+entryValue}</div>
+      <div class="litres">${entryMode==='amount'?`≈ ${qty.toFixed(2)}L` : `≈ ₹${amt.toFixed(2)}`}</div>
+    </div>
+    <div class="keypad">
+      ${['1','2','3','4','5','6','7','8','9','.','0','⌫'].map((k,i)=>`<button class="key ${k==='0'?'':''} ${k==='⌫'?'key-del':''}" onclick="keyPress('${k}')">${k}</button>`).join('')}
+    </div>
+    <div class="card-title">Payment Mode</div>
+    <div class="pay-grid">
+      ${['cash','phonepe','gpay','paytm','card','credit'].map(p=>`<button class="pay-btn ${currentPayMode===p?'selected':''}" onclick="selectPay('${p}')">${{cash:'💵 Cash',phonepe:'📱 PhonePe',gpay:'🟢 GPay',paytm:'🔵 Paytm',card:'💳 Card',credit:'📋 Credit'}[p]}</button>`).join('')}
+    </div>
+    ${currentPayMode==='credit'?`<div class="form-group"><label>Customer</label><select id="creditCust"><option value="">-- Select --</option>${customers.map(c=>`<option value="${c.id}">${c.company_name} (₹${c.outstanding} due)</option>`).join('')}</select></div>`:''}
+    <button class="btn btn-primary" onclick="submitSale(${price},${qty.toFixed(4)},${amt.toFixed(2)})" style="margin-top:8px" ${!shiftId?'disabled title="Open a shift first"':''}>
+      ${!shiftId?'⚠️ Open Shift First':'Record Sale ₹'+amt.toFixed(2)}
+    </button>`;
+}
+
+function selectFuel(f) { currentFuel = f; entryValue = ''; renderSaleUI(); }
+function selectPay(p) { currentPayMode = p; renderSaleUI(); }
+function setMode(m) { entryMode = m; entryValue = ''; renderSaleUI(); }
+function keyPress(k) {
+  if (k==='⌫') { entryValue = entryValue.slice(0,-1); }
+  else if (k==='.' && entryValue.includes('.')) return;
+  else if (entryValue.length >= 8) return;
+  else entryValue += k;
+  renderSaleUI();
+}
+
+async function submitSale(rate, quantity, amount) {
+  if (!entryValue || parseFloat(entryValue)<=0) return showToast('Enter amount or litres','error');
+  if (!shiftId) return showToast('Open a shift first','error');
+  const custId = currentPayMode==='credit' ? document.getElementById('creditCust')?.value : null;
+  const body = { fuelType: currentFuel, quantity, rate, amount, paymentMode: currentPayMode, shiftId, customerId: custId||undefined };
+  try {
+    const res = await apiFetch('/api/sales', { method: 'POST', body });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.error || data.errors?.[0]?.msg || 'Error','error');
+    showToast(`✓ Sale ₹${amount.toFixed(2)} recorded — ${data.invoiceNo}`,'success');
+    entryValue = ''; renderSaleUI();
+  } catch { showToast('Network error','error'); }
+}
+
+// ── Shifts ─────────────────────────────────────────────────────────────────
+async function renderShifts() {
+  const [curRes, listRes] = await Promise.all([apiFetch('/api/shifts/current'), apiFetch('/api/shifts')]);
+  const cur = (await curRes.json()).data;
+  const list = (await listRes.json()).data || [];
+  shiftId = cur?.id || null;
+  const c = document.getElementById('mainContent');
+  c.innerHTML = `
+    <div class="section-title">Current Shift</div>
+    ${cur ? `<div class="card" style="border-color:var(--green)">
+      <div style="font-size:13px;color:var(--muted)">Opened by ${cur.opened_by_name} · ${new Date(cur.open_time).toLocaleString('en-IN')}</div>
+      <div class="stat-grid" style="margin-top:12px">
+        <div class="stat-card"><div class="stat-value">₹${(cur.total_sales||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">Total Sales</div></div>
+        <div class="stat-card"><div class="stat-value">₹${(cur.cash_collected||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">Cash</div></div>
+        <div class="stat-card"><div class="stat-value">₹${(cur.upi_collected||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">UPI</div></div>
+        <div class="stat-card"><div class="stat-value">₹${(cur.credit_sales||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">Credit</div></div>
+      </div>
+      <div class="form-group" style="margin-top:12px"><label>Physical Cash in Hand (₹)</label><input type="number" id="physCash" placeholder="Enter cash counted"/></div>
+      <button class="btn btn-outline" style="border-color:var(--red);color:var(--red)" onclick="closeShift(${cur.id})">Close Shift</button>
+    </div>` : `<div class="card"><div class="empty"><div class="empty-icon">⏰</div>No open shift<br><small style="color:var(--muted)">Open a new shift to start recording sales</small></div>
+      <div class="form-group" style="margin-top:12px"><label>Shift Name</label><input id="shiftName" value="Day Shift"/></div>
+      <button class="btn btn-primary" onclick="openShift()">Open New Shift</button></div>`}
+    <div class="section-title" style="margin-top:16px">Recent Shifts</div>
+    ${list.slice(0,10).map(s=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${s.shift_name}</div><div class="list-item-sub">${new Date(s.open_time).toLocaleDateString('en-IN')} · ${s.opened_by_name}</div></div><div style="text-align:right"><div style="font-weight:700">₹${(s.total_sales||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="badge ${s.status==='open'?'badge-ms':'badge-cash'}">${s.status}</div></div></div>`).join('') || '<div class="empty">No shifts yet</div>'}`;
+}
+
+async function openShift() {
+  const name = document.getElementById('shiftName')?.value || 'Day Shift';
+  const res = await apiFetch('/api/shifts/open', { method: 'POST', body: { shiftName: name } });
+  const data = await res.json();
+  if (!res.ok) return showToast(data.error,'error');
+  shiftId = data.shiftId;
+  showToast('✓ Shift opened','success');
+  renderShifts();
+}
+
+async function closeShift(id) {
+  const cash = parseFloat(document.getElementById('physCash')?.value||0);
+  const res = await apiFetch(`/api/shifts/${id}/close`, { method: 'PUT', body: { cashPhysical: cash } });
+  const data = await res.json();
+  if (!res.ok) return showToast(data.error,'error');
+  shiftId = null;
+  showToast(`✓ Shift closed. Variance: ₹${data.variance}`,'success');
+  renderShifts();
+}
+
+// ── Stock ──────────────────────────────────────────────────────────────────
+async function renderStock() {
+  const res = await apiFetch('/api/reports/stock');
+  const { data } = await res.json();
+  const sRes = await apiFetch('/api/purchases/suppliers');
+  const suppliers = (await sRes.json()).data || [];
+  const c = document.getElementById('mainContent');
+  c.innerHTML = `
+    <div class="section-title">Tank Levels</div>
+    ${(data.tanks||[]).map(t=>{
+      const pct=Math.round((t.current_stock/t.capacity)*100);
+      const cls=t.fuel_type==='MS'?'fuel-ms':t.fuel_type==='HSD'?'fuel-hsd':'fuel-cng';
+      return `<div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:700">${t.tank_name}</span><span class="badge badge-${t.fuel_type.toLowerCase()}">${t.fuel_type}</span></div>
+      <div class="progress-track" style="margin-bottom:8px"><div class="progress-fill ${cls}" style="width:${pct}%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)"><span>${t.current_stock.toFixed(0)}L available</span><span>${pct}% of ${t.capacity}L</span></div></div>`;
+    }).join('')}
+    <div class="section-title" style="margin-top:8px">Add Purchase</div>
+    <div class="card">
+      <div class="form-group"><label>Tank</label><select id="pTank">${(data.tanks||[]).map(t=>`<option value="${t.id}">${t.tank_name} (${t.fuel_type})</option>`).join('')}</select></div>
+      <div class="form-group"><label>Supplier</label><select id="pSupp"><option value="">None</option>${suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Quantity (Litres)</label><input type="number" id="pQty" placeholder="e.g. 10000"/></div>
+      <div class="form-group"><label>Rate per Litre</label><input type="number" id="pRate" placeholder="e.g. 65.50"/></div>
+      <div class="form-group"><label>Invoice No (optional)</label><input type="text" id="pInv" placeholder="Invoice number"/></div>
+      <button class="btn btn-primary" onclick="addPurchase()">Add Purchase</button>
+    </div>
+    <div class="section-title" style="margin-top:8px">Recent Purchases</div>
+    ${(data.recentPurchases||[]).map(p=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${p.tank_name}</div><div class="list-item-sub">${p.quantity}L · ${p.supplier_name||'—'} · ${p.purchase_date}</div></div><div style="font-weight:700">₹${(p.total_amount||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('') || '<div class="empty">No purchases yet</div>'}`;
+}
+
+async function addPurchase() {
+  const tankId = document.getElementById('pTank').value;
+  const supplierId = document.getElementById('pSupp').value;
+  const quantity = parseFloat(document.getElementById('pQty').value);
+  const rate = parseFloat(document.getElementById('pRate').value);
+  const invoiceNo = document.getElementById('pInv').value;
+  if (!quantity || !rate) return showToast('Enter quantity and rate','error');
+  const res = await apiFetch('/api/purchases', { method: 'POST', body: { tankId, supplierId: supplierId||undefined, quantity, rate, invoiceNo: invoiceNo||undefined } });
+  const data = await res.json();
+  if (!res.ok) return showToast(data.error,'error');
+  showToast('✓ Purchase recorded','success');
+  renderStock();
+}
+
+// ── More ───────────────────────────────────────────────────────────────────
+function renderMore() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="section-title">More Options</div>
+    ${[
+      {icon:'📊',title:'Daily Report',sub:'Fuel-wise & payment-wise',fn:"showDailyReport()"},
+      {icon:'💳',title:'Credit Customers',sub:'Manage outstanding balances',fn:"showCustomers()"},
+      {icon:'👷',title:'Employees',sub:'Manage staff',fn:"showEmployees()"},
+      {icon:'📱',title:'UPI Report',sub:'PhonePe, GPay, Paytm breakdown',fn:"showUPIReport()"},
+      {icon:'⚙️',title:'Settings',sub:'Station config & users',fn:"showSettings()"},
+      {icon:'📋',title:'Audit Log',sub:'Activity history',fn:"showAuditLog()"},
+    ].map(m=>`<div class="list-item" onclick="${m.fn}" style="cursor:pointer"><div style="font-size:24px;margin-right:12px">${m.icon}</div><div class="list-item-left"><div class="list-item-title">${m.title}</div><div class="list-item-sub">${m.sub}</div></div><div style="color:var(--muted)">›</div></div>`).join('')}`;
+}
+
+async function showDailyReport() {
+  const today = new Date().toISOString().slice(0,10);
+  const res = await apiFetch(`/api/reports/daily?date=${today}`);
+  const { data } = await res.json();
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Daily Report — ${today}</div>
+    <div class="card"><div class="card-title">Fuel-Wise</div>${(data.fuelWise||[]).map(f=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${f.fuel_type}</div><div class="list-item-sub">${f.qty?.toFixed(2)}L · ${f.txns} transactions</div></div><div style="font-weight:700">₹${f.amount?.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('') || '<div class="empty">No data</div>'}</div>
+    <div class="card"><div class="card-title">Payment-Wise</div>${(data.paymentWise||[]).map(p=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${p.payment_mode}</div><div class="list-item-sub">${p.txns} transactions</div></div><div style="font-weight:700">₹${p.amount?.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('') || '<div class="empty">No data</div>'}</div>`;
+}
+
+async function showCustomers() {
+  const res = await apiFetch('/api/customers');
+  const custs = (await res.json()).data || [];
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="section-title" style="margin:0">Credit Customers</div><button onclick="addCustomerForm()" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px">+ Add</button></div>
+    <div id="custList">${custs.map(c=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${c.company_name}</div><div class="list-item-sub">Limit: ₹${c.credit_limit.toLocaleString('en-IN',{maximumFractionDigits:0})} · Due: ₹${c.outstanding.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div><div style="font-weight:700;color:${c.outstanding>0?'var(--red)':'var(--green)'}">₹${c.outstanding.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('') || '<div class="empty">No customers</div>'}</div>`;
+}
+
+function addCustomerForm() {
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="showCustomers()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Add Credit Customer</div>
+    <div class="card">
+      <div class="form-group"><label>Company Name</label><input id="cName" type="text" placeholder="Company or person name"/></div>
+      <div class="form-group"><label>Contact Name</label><input id="cContact" type="text" placeholder="Contact person"/></div>
+      <div class="form-group"><label>Mobile</label><input id="cMobile" type="tel" placeholder="Mobile number"/></div>
+      <div class="form-group"><label>Credit Limit (₹)</label><input id="cLimit" type="number" placeholder="e.g. 50000"/></div>
+      <button class="btn btn-primary" onclick="saveCustomer()">Save Customer</button>
+    </div>`;
+}
+
+async function saveCustomer() {
+  const companyName=document.getElementById('cName').value.trim();
+  const contactName=document.getElementById('cContact').value.trim();
+  const mobile=document.getElementById('cMobile').value.trim();
+  const creditLimit=parseFloat(document.getElementById('cLimit').value);
+  if(!companyName||!creditLimit) return showToast('Fill required fields','error');
+  const res=await apiFetch('/api/customers',{method:'POST',body:{companyName,contactName,mobile,creditLimit}});
+  const data=await res.json();
+  if(!res.ok) return showToast(data.error,'error');
+  showToast('✓ Customer added','success');
+  showCustomers();
+}
+
+async function showEmployees() {
+  const res = await apiFetch('/api/employees');
+  const emps = (await res.json()).data || [];
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Employees</div>
+    ${emps.map(e=>`<div class="list-item"><div style="width:36px;height:36px;background:var(--accent2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:10px">${e.full_name[0]}</div><div class="list-item-left"><div class="list-item-title">${e.full_name}</div><div class="list-item-sub">${e.role} · ₹${(e.salary||0).toLocaleString('en-IN',{maximumFractionDigits:0})}/month</div></div></div>`).join('') || '<div class="empty">No employees</div>'}`;
+}
+
+async function showUPIReport() {
+  const today = new Date().toISOString().slice(0,10);
+  const res = await apiFetch(`/api/reports/upi?from=${today}&to=${today}`);
+  const data = (await res.json()).data || [];
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">UPI Report — Today</div>
+    <div class="card">
+      ${data.map(u=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${{phonepe:'📱 PhonePe',gpay:'🟢 Google Pay',paytm:'🔵 Paytm'}[u.payment_mode]||u.payment_mode}</div><div class="list-item-sub">${u.txns} transactions</div></div><div style="font-weight:700">₹${u.amount.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`).join('') || '<div class="empty">No UPI transactions today</div>'}
+      ${data.length?`<div class="list-item" style="border-top:1px solid var(--border);margin-top:4px;padding-top:12px"><div class="list-item-left"><div class="list-item-title" style="font-weight:800">Total UPI</div></div><div style="font-weight:800;font-size:16px">₹${data.reduce((a,b)=>a+b.amount,0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>`:''}
+    </div>`;
+}
+
+async function showSettings() {
+  const res = await apiFetch('/api/settings');
+  const s = (await res.json()).data;
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Station Settings</div>
+    <div class="card">
+      <div class="form-group"><label>Station Name</label><input id="sName" value="${s.station_name||''}"/></div>
+      <div class="form-group"><label>MS Price (₹/L)</label><input id="sMS" type="number" value="${s.ms_price||102}"/></div>
+      <div class="form-group"><label>HSD Price (₹/L)</label><input id="sHSD" type="number" value="${s.hsd_price||90}"/></div>
+      <div class="form-group"><label>CNG Price (₹/L)</label><input id="sCNG" type="number" value="${s.cng_price||85}"/></div>
+      <div class="form-group"><label>Idle Timeout (minutes)</label><input id="sIdle" type="number" value="${s.idle_timeout||15}"/></div>
+      <div class="form-group"><label>GSTIN</label><input id="sGST" value="${s.gstin||''}"/></div>
+      <div class="form-group"><label>Mobile</label><input id="sMob" value="${s.mobile||''}"/></div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>`;
+}
+
+async function saveSettings() {
+  const body={stationName:document.getElementById('sName').value,msPrice:parseFloat(document.getElementById('sMS').value),hsdPrice:parseFloat(document.getElementById('sHSD').value),cngPrice:parseFloat(document.getElementById('sCNG').value),idleTimeout:parseInt(document.getElementById('sIdle').value),gstin:document.getElementById('sGST').value,mobile:document.getElementById('sMob').value};
+  const res=await apiFetch('/api/settings',{method:'PUT',body});
+  const data=await res.json();
+  if(!res.ok) return showToast(data.error,'error');
+  if(currentStation){currentStation.msPrice=body.msPrice;currentStation.hsdPrice=body.hsdPrice;currentStation.cngPrice=body.cngPrice;}
+  showToast('✓ Settings saved','success');
+}
+
+async function showAuditLog() {
+  const res = await apiFetch('/api/settings/audit');
+  const logs = (await res.json()).data || [];
+  document.getElementById('mainContent').innerHTML = `
+    <button onclick="renderMore()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Audit Log</div>
+    ${logs.map(l=>`<div class="list-item"><div class="list-item-left"><div class="list-item-title">${l.action} · ${l.resource||''}</div><div class="list-item-sub">${l.username} · ${new Date(l.created_at).toLocaleString('en-IN')}</div></div><div class="badge ${l.status==='success'?'badge-ms':'badge-credit'}">${l.status}</div></div>`).join('') || '<div class="empty">No audit records</div>'}`;
+}
+
+// ── Super Admin ────────────────────────────────────────────────────────────
+async function renderSuperDashboard() {
+  const [statsRes, stationsRes] = await Promise.all([apiFetch('/api/super/stats'), apiFetch('/api/super/stations')]);
+  const stats = (await statsRes.json()).data;
+  const stations = (await stationsRes.json()).data || [];
+  document.getElementById('superContent').innerHTML = `
+    <div class="section-title">Platform Overview</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${stats.totalStations}</div><div class="stat-label">Total Stations</div></div>
+      <div class="stat-card"><div class="stat-value">${stats.activeStations}</div><div class="stat-label">Active</div></div>
+      <div class="stat-card"><div class="stat-value">₹${(stats.todayRevenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div><div class="stat-label">Today's Revenue</div></div>
+      <div class="stat-card"><div class="stat-value">${stats.totalUsers}</div><div class="stat-label">Total Users</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+      <div class="section-title" style="margin:0">All Stations</div>
+      <button onclick="showAddStation()" style="background:var(--accent);border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">+ New Station</button>
+    </div>
+    ${stations.map(s=>`<div class="station-row">
+      <div class="station-row-header">
+        <div><span ${s.is_active?'class="active-dot"':'class="inactive-dot"'}></span><strong>${s.station_code}</strong> — ${s.station_name}</div>
+        <span class="plan-badge plan-${s.plan}">${s.plan.toUpperCase()}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;color:var(--muted);margin-bottom:10px">
+        <div>👥 ${s.user_count} users</div>
+        <div>🛒 ${s.today_sales} sales today</div>
+        <div>₹${(s.today_revenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})} today</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="toggleStation(${s.id},${s.is_active?0:1})" style="flex:1;padding:8px;border:1px solid var(--border);background:transparent;color:${s.is_active?'var(--red)':'var(--green)'};border-radius:8px;cursor:pointer;font-size:12px">${s.is_active?'Suspend':'Activate'}</button>
+        <button onclick="changePlan(${s.id},'${s.plan}')" style="flex:1;padding:8px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-size:12px">Change Plan</button>
+      </div>
+    </div>`).join('') || '<div class="empty">No stations yet</div>'}`;
+}
+
+function showAddStation() {
+  document.getElementById('superContent').innerHTML = `
+    <button onclick="renderSuperDashboard()" style="background:transparent;border:none;color:var(--accent);cursor:pointer;margin-bottom:12px">← Back</button>
+    <div class="section-title">Add New Station</div>
+    <div class="card">
+      <div class="form-group"><label>Station Code</label><input id="nsCode" placeholder="e.g. BPCL001" style="text-transform:uppercase"/></div>
+      <div class="form-group"><label>Station Name</label><input id="nsName" placeholder="Station name"/></div>
+      <div class="form-group"><label>Owner Username</label><input id="nsUser" placeholder="Min 4 chars"/></div>
+      <div class="form-group"><label>Owner Password</label><input id="nsPass" type="password" placeholder="Upper+Lower+Number+Special"/></div>
+      <div class="form-group"><label>Owner Full Name</label><input id="nsFull" placeholder="Full name"/></div>
+      <div class="form-group"><label>Plan</label><select id="nsPlan"><option value="trial">Trial</option><option value="basic">Basic</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
+      <button class="btn btn-primary" onclick="createStation()">Create Station</button>
+    </div>`;
+}
+
+async function createStation() {
+  const body={stationCode:document.getElementById('nsCode').value.trim().toUpperCase(),stationName:document.getElementById('nsName').value.trim(),ownerUsername:document.getElementById('nsUser').value.trim(),ownerPassword:document.getElementById('nsPass').value,ownerFullName:document.getElementById('nsFull').value.trim(),plan:document.getElementById('nsPlan').value};
+  const res=await apiFetch('/api/super/stations',{method:'POST',body});
+  const data=await res.json();
+  if(!res.ok) return showToast(data.error||data.errors?.[0]?.msg||'Error','error');
+  showToast('✓ Station created','success');
+  renderSuperDashboard();
+}
+
+async function toggleStation(id, active) {
+  await apiFetch(`/api/super/stations/${id}`, {method:'PUT', body:{isActive:active}});
+  showToast(active?'✓ Station activated':'Station suspended','success');
+  renderSuperDashboard();
+}
+
+async function changePlan(id, currentPlan) {
+  const plans = ['trial','basic','pro','enterprise'];
+  const next = plans[(plans.indexOf(currentPlan)+1)%plans.length];
+  await apiFetch(`/api/super/stations/${id}`, {method:'PUT', body:{plan:next}});
+  showToast(`✓ Plan changed to ${next}`,'success');
+  renderSuperDashboard();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
