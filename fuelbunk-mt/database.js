@@ -112,13 +112,11 @@ async function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
       tank_name TEXT NOT NULL, fuel_type TEXT NOT NULL CHECK(fuel_type IN ('MS','HSD','CNG')),
-      display_name TEXT,
       capacity REAL NOT NULL, current_stock REAL NOT NULL DEFAULT 0,
       min_alert REAL NOT NULL DEFAULT 2000, is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
-    `ALTER TABLE tanks ADD COLUMN display_name TEXT`,
     `CREATE TABLE IF NOT EXISTS nozzles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
@@ -278,114 +276,43 @@ async function initSchema() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(station_id, employee_id, payroll_month, payroll_year)
     )`,
+    // ── SPRINT 3: DIP CHARTS ──────────────────────────────────────────────
+    // Each tank can have a dip chart: array of {mm, litres} calibration entries
+    `CREATE TABLE IF NOT EXISTS dip_charts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_id INTEGER NOT NULL REFERENCES tanks(id) ON DELETE CASCADE,
+      dip_mm REAL NOT NULL,
+      litres REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(tank_id, dip_mm)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_dip_charts_tank ON dip_charts(tank_id)`,
+    // ── SPRINT 3: STOCK VARIATION ALERTS ─────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS stock_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+      tank_id INTEGER NOT NULL REFERENCES tanks(id) ON DELETE CASCADE,
+      alert_date TEXT NOT NULL DEFAULT (date('now')),
+      meter_stock REAL NOT NULL,
+      dip_stock REAL NOT NULL,
+      variance_litres REAL NOT NULL,
+      variance_pct REAL NOT NULL,
+      tolerance_pct REAL NOT NULL DEFAULT 1.0,
+      is_flagged INTEGER NOT NULL DEFAULT 0,
+      acknowledged INTEGER NOT NULL DEFAULT 0,
+      acknowledged_by INTEGER,
+      acknowledged_at TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_stock_alerts_station ON stock_alerts(station_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_stock_alerts_date ON stock_alerts(station_id, alert_date)`,
     // Indexes
     `CREATE INDEX IF NOT EXISTS idx_attendance_station ON attendance(station_id)`,
     `CREATE INDEX IF NOT EXISTS idx_attendance_emp ON attendance(employee_id, work_date)`,
     `CREATE INDEX IF NOT EXISTS idx_payroll_station ON payroll_runs(station_id)`,
     `CREATE INDEX IF NOT EXISTS idx_advances_emp ON salary_advances(employee_id)`,
-
-    // ── SPRINT 4: NOTIFICATION SETTINGS ──────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS notification_settings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL UNIQUE REFERENCES stations(id) ON DELETE CASCADE,
-      wa_enabled INTEGER NOT NULL DEFAULT 0,
-      wa_number TEXT,
-      wa_provider TEXT NOT NULL DEFAULT 'simulate',
-      low_stock_enabled INTEGER NOT NULL DEFAULT 1,
-      low_stock_threshold REAL,
-      day_close_enabled INTEGER NOT NULL DEFAULT 1,
-      day_close_time TEXT NOT NULL DEFAULT '22:00',
-      credit_reminder_enabled INTEGER NOT NULL DEFAULT 1,
-      credit_reminder_days INTEGER NOT NULL DEFAULT 30,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-    // ── SPRINT 4: NOTIFICATION LOG ────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS notification_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      type TEXT NOT NULL,
-      recipient TEXT,
-      message TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'sent',
-      error_msg TEXT,
-      provider TEXT,
-      meta TEXT,
-      sent_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_notif_log_station ON notification_log(station_id, sent_at)`,
-
-    // ── SPRINT 5: DIP CHART CALIBRATION DATA ─────────────────────────────
-    `CREATE TABLE IF NOT EXISTS dip_chart_data (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      tank_id INTEGER NOT NULL REFERENCES tanks(id) ON DELETE CASCADE,
-      mm_level REAL NOT NULL,
-      litres_volume REAL NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(tank_id, mm_level)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_dip_chart_tank ON dip_chart_data(tank_id, mm_level)`,
-
-    // ── SPRINT 5: PRODUCT SALES (Lubes & Accessories) ────────────────────
-    `CREATE TABLE IF NOT EXISTS product_sales (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      invoice_no TEXT NOT NULL,
-      product_id INTEGER NOT NULL REFERENCES products(id),
-      shift_id INTEGER REFERENCES shifts(id),
-      quantity REAL NOT NULL,
-      rate REAL NOT NULL,
-      mrp REAL NOT NULL DEFAULT 0,
-      discount REAL NOT NULL DEFAULT 0,
-      gst_rate REAL NOT NULL DEFAULT 18,
-      gst_amount REAL NOT NULL DEFAULT 0,
-      total_amount REAL NOT NULL,
-      payment_mode TEXT NOT NULL DEFAULT 'cash',
-      customer_name TEXT,
-      vehicle_no TEXT,
-      served_by INTEGER,
-      is_cancelled INTEGER NOT NULL DEFAULT 0,
-      cancel_reason TEXT,
-      sale_time TEXT NOT NULL DEFAULT (datetime('now')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_product_sales_station ON product_sales(station_id, sale_time)`,
-    `CREATE INDEX IF NOT EXISTS idx_product_sales_product ON product_sales(product_id)`,
-
-    // ── SPRINT 5: PRODUCT STOCK-IN ────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS product_stock_in (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      product_id INTEGER NOT NULL REFERENCES products(id),
-      quantity REAL NOT NULL,
-      rate REAL NOT NULL DEFAULT 0,
-      invoice_no TEXT,
-      supplier_name TEXT,
-      notes TEXT,
-      received_by INTEGER,
-      stock_date TEXT NOT NULL DEFAULT (date('now')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-
-    // ── SPRINT 6: BANK RECONCILIATION ─────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS bank_reconciliation (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      recon_date TEXT NOT NULL,
-      cash_deposited REAL NOT NULL DEFAULT 0,
-      upi_phonepe REAL NOT NULL DEFAULT 0,
-      upi_gpay REAL NOT NULL DEFAULT 0,
-      upi_paytm REAL NOT NULL DEFAULT 0,
-      upi_other REAL NOT NULL DEFAULT 0,
-      card_settled REAL NOT NULL DEFAULT 0,
-      notes TEXT,
-      recorded_by INTEGER,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(station_id, recon_date)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_bank_recon_station ON bank_reconciliation(station_id, recon_date)`,
-
     // Indexes
     `CREATE INDEX IF NOT EXISTS idx_sales_station ON sales(station_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sales_time ON sales(sale_time)`,
@@ -394,63 +321,6 @@ async function initSchema() {
     `CREATE INDEX IF NOT EXISTS idx_users_station ON users(station_id)`,
     `CREATE INDEX IF NOT EXISTS idx_tanks_station ON tanks(station_id)`,
     `CREATE INDEX IF NOT EXISTS idx_audit_station ON audit_log(station_id)`,
-
-    // ── SPRINT 7: SUPPLIER PAYMENTS ───────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS supplier_payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
-      amount REAL NOT NULL,
-      payment_mode TEXT NOT NULL DEFAULT 'neft',
-      reference_no TEXT,
-      payment_date TEXT NOT NULL DEFAULT (date('now')),
-      notes TEXT,
-      recorded_by INTEGER REFERENCES users(id),
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_sup_pay_station ON supplier_payments(station_id, supplier_id)`,
-
-    // ── SPRINT 7: SUPPLIER BANK DETAILS (ALTER — safe) ───────────────────
-    `ALTER TABLE suppliers ADD COLUMN bank_name TEXT`,
-    `ALTER TABLE suppliers ADD COLUMN account_no TEXT`,
-    `ALTER TABLE suppliers ADD COLUMN ifsc_code TEXT`,
-    `ALTER TABLE suppliers ADD COLUMN address TEXT`,
-    `ALTER TABLE suppliers ADD COLUMN email TEXT`,
-
-    // ── SPRINT 7: SHIFT CONFIGS (multi-shift Morning/Afternoon/Night) ─────
-    `CREATE TABLE IF NOT EXISTS shift_configs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      shift_name TEXT NOT NULL,
-      start_time TEXT NOT NULL DEFAULT '06:00',
-      end_time TEXT NOT NULL DEFAULT '14:00',
-      default_nozzle_ids TEXT DEFAULT '[]',
-      is_active INTEGER NOT NULL DEFAULT 1,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(station_id, shift_name)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_shift_configs_station ON shift_configs(station_id)`,
-
-    // ── SPRINT 7: OFFLINE SALE QUEUE (for IndexedDB sync) ────────────────
-    `CREATE TABLE IF NOT EXISTS offline_sale_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      client_id TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','synced','failed')),
-      synced_invoice_no TEXT,
-      error_msg TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      synced_at TEXT,
-      UNIQUE(station_id, client_id)
-    )`,
-
-    // ── SPRINT 7: NOTIFICATION SETTINGS extra fields ──────────────────────
-    `ALTER TABLE notification_settings ADD COLUMN expiry_alert_enabled INTEGER NOT NULL DEFAULT 1`,
-    `ALTER TABLE notification_settings ADD COLUMN expiry_alert_days INTEGER NOT NULL DEFAULT 30`,
-    `ALTER TABLE notification_settings ADD COLUMN sms_enabled INTEGER NOT NULL DEFAULT 0`,
-    `ALTER TABLE notification_settings ADD COLUMN sms_number TEXT`,
   ];
   for (const s of tables) {
     await client.execute(s).catch(e => { if(!e.message?.includes('already exists')) console.warn('[DB]',e.message?.substring(0,60)); });
