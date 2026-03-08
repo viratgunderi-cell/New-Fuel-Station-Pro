@@ -229,9 +229,9 @@ router.get('/settings', async (req, res) => {
 });
 
 router.put('/settings', authorize('owner'), async (req, res) => {
-  const { stationName, msPrice, hsdPrice, cngPrice, idleTimeout, gstin, address, mobile, email } = req.body;
-  await db.run(`UPDATE stations SET station_name=COALESCE(?,station_name),ms_price=COALESCE(?,ms_price),hsd_price=COALESCE(?,hsd_price),cng_price=COALESCE(?,cng_price),idle_timeout=COALESCE(?,idle_timeout),gstin=COALESCE(?,gstin),address=COALESCE(?,address),mobile=COALESCE(?,mobile),email=COALESCE(?,email),updated_at=datetime('now') WHERE id=?`,
-    [stationName||null, msPrice||null, hsdPrice||null, cngPrice||null, idleTimeout||null, gstin||null, address||null, mobile||null, email||null, req.user.stationId]);
+  const { stationName, msPrice, hsdPrice, cngPrice, xpPrice, idleTimeout, gstin, address, mobile, email } = req.body;
+  await db.run(`UPDATE stations SET station_name=COALESCE(?,station_name),ms_price=COALESCE(?,ms_price),hsd_price=COALESCE(?,hsd_price),cng_price=COALESCE(?,cng_price),xp_price=COALESCE(?,xp_price),idle_timeout=COALESCE(?,idle_timeout),gstin=COALESCE(?,gstin),address=COALESCE(?,address),mobile=COALESCE(?,mobile),email=COALESCE(?,email),updated_at=datetime('now') WHERE id=?`,
+    [stationName||null, msPrice||null, hsdPrice||null, cngPrice||null, xpPrice||null, idleTimeout||null, gstin||null, address||null, mobile||null, email||null, req.user.stationId]);
   res.json({ success: true, message: 'Settings updated.' });
 });
 
@@ -646,6 +646,7 @@ router.get('/reports/vehicles', async (req, res) => {
 const DENSITY_RANGES = {
   MS:  { min: 0.720, max: 0.775, label: 'MS (Petrol)' },
   HSD: { min: 0.820, max: 0.870, label: 'HSD (Diesel)' },
+  XP:  { min: 0.720, max: 0.775, label: 'XP Premium' },
   CNG: { min: null,  max: null,  label: 'CNG' },
 };
 

@@ -51,7 +51,7 @@ router.post('/login', authLimiter,
       await db.logAudit(station.id, user.id, user.username, 'LOGIN', 'auth', user.id, null, null, req.ip, req.get('user-agent'));
       return res.json({ success: true, accessToken, refreshToken, expiresIn: JWT_EXPIRES_IN,
         user: { id: user.id, username: user.username, fullName: user.full_name, role: user.role },
-        station: { id: station.id, code: station.station_code, name: station.station_name, msPrice: station.ms_price, hsdPrice: station.hsd_price, cngPrice: station.cng_price, idleTimeout: station.idle_timeout, plan: station.plan }
+        station: { id: station.id, code: station.station_code, name: station.station_name, msPrice: station.ms_price, hsdPrice: station.hsd_price, cngPrice: station.cng_price, xpPrice: station.xp_price, idleTimeout: station.idle_timeout, plan: station.plan }
       });
     } catch(e) { console.error('[auth/login]', e.message); return res.status(500).json({ success: false, error: 'Server error.' }); }
   }
@@ -118,7 +118,7 @@ router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) return res.status(401).json({ success: false, error: 'Refresh token required.' });
   const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-  const stored = await db.get(`SELECT rt.*,u.username,u.role,u.is_active,u.station_id,s.station_code,s.station_name,s.ms_price,s.hsd_price,s.cng_price,sa.username as sa_username,sa.is_active as sa_active FROM refresh_tokens rt LEFT JOIN users u ON u.id=rt.user_id LEFT JOIN stations s ON s.id=rt.station_id LEFT JOIN super_admins sa ON sa.id=rt.super_admin_id WHERE rt.token_hash=? AND rt.expires_at>datetime('now')`, [hash]);
+  const stored = await db.get(`SELECT rt.*,u.username,u.role,u.is_active,u.station_id,s.station_code,s.station_name,s.ms_price,s.hsd_price,s.cng_price,s.xp_price,sa.username as sa_username,sa.is_active as sa_active FROM refresh_tokens rt LEFT JOIN users u ON u.id=rt.user_id LEFT JOIN stations s ON s.id=rt.station_id LEFT JOIN super_admins sa ON sa.id=rt.super_admin_id WHERE rt.token_hash=? AND rt.expires_at>datetime('now')`, [hash]);
   if (!stored) return res.status(401).json({ success: false, error: 'Invalid refresh token.' });
   let accessToken;
   if (stored.super_admin_id) {
@@ -144,7 +144,8 @@ router.get('/me', authenticate, async (req, res) => {
     return res.json({ success: true, user: sa, isSuperAdmin: true });
   }
   const user = await db.get('SELECT id,username,full_name,role,mobile,last_login FROM users WHERE id=? AND station_id=?', [req.user.id, req.user.stationId]);
-  const station = await db.get('SELECT id,station_code,station_name,ms_price,hsd_price,cng_price,idle_timeout,plan,is_active FROM stations WHERE id=?', [req.user.stationId]);
+  const s = await db.get('SELECT id,station_code,station_name,ms_price,hsd_price,cng_price,xp_price,idle_timeout,plan,is_active FROM stations WHERE id=?', [req.user.stationId]);
+  const station = s ? { id:s.id, code:s.station_code, name:s.station_name, msPrice:s.ms_price, hsdPrice:s.hsd_price, cngPrice:s.cng_price, xpPrice:s.xp_price, idleTimeout:s.idle_timeout, plan:s.plan } : null;
   return res.json({ success: true, user, station });
 });
 

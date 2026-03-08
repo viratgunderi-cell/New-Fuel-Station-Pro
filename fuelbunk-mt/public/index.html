@@ -248,6 +248,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .fuel-tag-ms{background:rgba(34,197,94,.15);color:#4ade80}
 .fuel-tag-hsd{background:rgba(249,115,22,.15);color:#fb923c}
 .fuel-tag-cng{background:rgba(168,85,247,.15);color:#c084fc}
+.fuel-tag-xp{background:rgba(234,179,8,.15);color:#fbbf24}
 .tank-level-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px}
 .level-low{background:var(--red-dim);color:#fca5a5;border:1px solid rgba(239,68,68,.3)}
 .level-med{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
@@ -284,6 +285,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .fuel-name-ms{color:#4ade80;font-weight:600}
 .fuel-name-hsd{color:#fb923c;font-weight:600}
 .fuel-name-cng{color:#c084fc;font-weight:600}
+.fuel-name-xp{color:#fbbf24;font-weight:600}
 .fuel-name-xp95{color:#60a5fa;font-weight:600}
 
 /* ═══ BADGES ═══════════════════════════════════════════ */
@@ -291,6 +293,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .badge-ms{background:rgba(34,197,94,.15);color:#4ade80}
 .badge-hsd{background:rgba(249,115,22,.15);color:#fb923c}
 .badge-cng{background:rgba(168,85,247,.15);color:#c084fc}
+.badge-xp{background:rgba(234,179,8,.15);color:#fbbf24}
 .badge-cash{background:rgba(245,158,11,.15);color:#fcd34d}
 .badge-upi{background:rgba(139,92,246,.15);color:#c4b5fd}
 .badge-credit{background:var(--red-dim);color:#fca5a5}
@@ -889,7 +892,7 @@ async function renderDashboard(){
     const level=pct<25?'low':pct<50?'med':'ok';
     const fillCls=level==='low'?'fill-low':level==='med'?'fill-med':'fill-ok';
     const lvlBadge=level==='low'?'level-low':level==='med'?'level-med':'level-ok';
-    const fuelTag=t.fuel_type==='MS'?'fuel-tag-ms':t.fuel_type==='HSD'?'fuel-tag-hsd':'fuel-tag-cng';
+    const fuelTag=t.fuel_type==='MS'?'fuel-tag-ms':t.fuel_type==='HSD'?'fuel-tag-hsd':t.fuel_type==='XP'?'fuel-tag-xp':'fuel-tag-cng';
     return `<div class="tank-card">
       <div class="tank-card-head">
         <div style="display:flex;align-items:center;gap:8px">
@@ -978,7 +981,7 @@ async function renderDashboard(){
       </div>
       <table class="data-table">
         <thead><tr><th>Invoice</th><th>Fuel</th><th>Qty</th><th>Amount</th><th>Payment</th><th>Time</th></tr></thead>
-        <tbody>${(data.recentSales||[]).slice(0,8).map(s=>`<tr><td style="font-weight:600;color:var(--text)">${s.invoice_no}</td><td class="${s.fuel_type==='MS'?'fuel-name-ms':s.fuel_type==='HSD'?'fuel-name-hsd':'fuel-name-cng'}">${s.fuel_type}</td><td>${s.quantity}L</td><td style="font-weight:700">₹${fmt(s.total_amount)}</td><td><span class="badge badge-${s.payment_mode==='cash'?'cash':'upi'}">${s.payment_mode}</span></td><td style="color:var(--text3)">${new Date(s.sale_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</td></tr>`).join('')||`<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text2)">No sales today</td></tr>`}
+        <tbody>${(data.recentSales||[]).slice(0,8).map(s=>`<tr><td style="font-weight:600;color:var(--text)">${s.invoice_no}</td><td class="${s.fuel_type==='MS'?'fuel-name-ms':s.fuel_type==='HSD'?'fuel-name-hsd':s.fuel_type==='XP'?'fuel-name-xp':'fuel-name-cng'}">${s.fuel_type}</td><td>${s.quantity}L</td><td style="font-weight:700">₹${fmt(s.total_amount)}</td><td><span class="badge badge-${s.payment_mode==='cash'?'cash':'upi'}">${s.payment_mode}</span></td><td style="color:var(--text3)">${new Date(s.sale_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</td></tr>`).join('')||`<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text2)">No sales today</td></tr>`}
         </tbody>
       </table>
     </div>`;
@@ -1005,13 +1008,13 @@ async function renderSale(){
   entryValue=''; currentFuel='MS'; currentPayMode='cash'; entryMode='amount'; renderSaleUI();
 }
 function renderSaleUI(){
-  const prices={MS:currentStation?.msPrice||102,HSD:currentStation?.hsdPrice||90,CNG:currentStation?.cngPrice||85};
+  const prices={MS:currentStation?.msPrice||102,HSD:currentStation?.hsdPrice||90,CNG:currentStation?.cngPrice||85,XP:currentStation?.xpPrice||110};
   const price=prices[currentFuel]||100;
   const qty=entryMode==='litres'?parseFloat(entryValue||0):parseFloat(entryValue||0)/price;
   const amt=entryMode==='amount'?parseFloat(entryValue||0):qty*price;
   document.getElementById('mainContent').innerHTML=`
     <div class="card-title">Select Fuel</div>
-    <div class="fuel-grid">${['MS','HSD','CNG'].map(f=>`<button class="fuel-btn ${currentFuel===f?'selected':''}" onclick="selectFuel('${f}')"><div style="font-size:18px">${f==='MS'?'🟢':f==='HSD'?'🔵':'🟠'}</div><div>${f}</div><div class="fuel-price">₹${prices[f]}/L</div></button>`).join('')}</div>
+    <div class="fuel-grid">${['MS','HSD','XP'].map(f=>`<button class="fuel-btn ${currentFuel===f?'selected':''}" onclick="selectFuel('${f}')"><div style="font-size:18px">${f==='MS'?'🟢':f==='HSD'?'🔵':'⭐'}</div><div>${f}</div><div class="fuel-price">₹${prices[f]}/L</div></button>`).join('')}</div>
     <div class="mode-toggle"><button class="mode-btn ${entryMode==='amount'?'active':''}" onclick="setMode('amount')">₹ Amount</button><button class="mode-btn ${entryMode==='litres'?'active':''}" onclick="setMode('litres')">⛽ Litres</button></div>
     <div class="amount-display"><div class="rupee">${entryMode==='amount'?'₹'+entryValue:'⛽'+entryValue}</div><div class="litres">${entryMode==='amount'?`≈ ${qty.toFixed(2)}L`:`≈ ₹${amt.toFixed(2)}`}</div></div>
     <div class="keypad">${['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(k=>`<button class="key ${k==='⌫'?'key-del':''}" onclick="keyPress('${k}')">${k}</button>`).join('')}</div>
@@ -1116,6 +1119,7 @@ const FUEL_CFG = {
   MS:  { label:'Petrol',  sub:'Petrol (MS)',    dot:'#ef4444', border:'rgba(239,68,68,.45)',  bg:'rgba(239,68,68,.07)',  badge:'background:rgba(239,68,68,.18);color:#fca5a5' },
   HSD: { label:'Diesel',  sub:'Diesel (HSD)',   dot:'#f97316', border:'rgba(249,115,22,.45)', bg:'rgba(249,115,22,.07)', badge:'background:rgba(249,115,22,.18);color:#fdba74' },
   CNG: { label:'CNG',     sub:'CNG (Gas)',      dot:'#3b82f6', border:'rgba(59,130,246,.45)', bg:'rgba(59,130,246,.07)', badge:'background:rgba(59,130,246,.18);color:#93c5fd' },
+  XP:  { label:'Premium', sub:'XP Premium (95)',dot:'#f59e0b', border:'rgba(245,158,11,.45)', bg:'rgba(245,158,11,.07)', badge:'background:rgba(234,179,8,.18);color:#fbbf24' },
 };
 // displayName lets stations give custom names like "XP95 Premium" to MS tanks
 function tankLabel(t){ return t.display_name || FUEL_CFG[t.fuel_type]?.label || t.fuel_type; }
@@ -1293,6 +1297,7 @@ function showAddTankModal(){
             {type:'MS',  label:'Petrol',  sub:'Petrol (MS)',   dot:'#ef4444', sel:'rgba(239,68,68,.25)'},
             {type:'HSD', label:'Diesel',  sub:'Diesel (HSD)',  dot:'#f97316', sel:'rgba(249,115,22,.25)'},
             {type:'CNG', label:'CNG',     sub:'CNG (Gas)',     dot:'#3b82f6', sel:'rgba(59,130,246,.25)'},
+            {type:'XP',  label:'Premium', sub:'XP Premium (95)',dot:'#f59e0b', sel:'rgba(245,158,11,.25)'},
           ].map(f=>`
             <button id="at_ft_${f.type}" onclick="atSelectFuel('${f.type}')"
               style="padding:16px 10px;background:var(--surface2);border:2px solid var(--border2);border-radius:12px;cursor:pointer;text-align:center;transition:.15s">
@@ -1306,7 +1311,7 @@ function showAddTankModal(){
         <!-- Custom display name -->
         <div style="margin-bottom:18px">
           <label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.8px;display:block;margin-bottom:6px">CUSTOM FUEL NAME <span style="font-weight:400">(optional — e.g. XP95 Premium)</span></label>
-          <input id="at_dname" placeholder="Leave blank to use default (Petrol / Diesel / CNG)" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box"/>
+          <input id="at_dname" placeholder="Leave blank to use default (Petrol / Diesel / Premium)" style="width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box"/>
         </div>
 
         <!-- Tank Capacity -->
@@ -1350,7 +1355,7 @@ function showAddTankModal(){
 }
 function atSelectFuel(type){
   document.getElementById('at_fuel').value=type;
-  ['MS','HSD','CNG'].forEach(t=>{
+  ['MS','HSD','CNG','XP'].forEach(t=>{
     const b=document.getElementById(`at_ft_${t}`);
     if(!b)return;
     const cfg=FUEL_CFG[t];
@@ -3011,6 +3016,7 @@ async function showSettings(activeTab){
       <div class="form-group"><label>MS Price (₹/L)</label><input id="sMS" type="number" step="0.01" value="${s.ms_price||102}"/></div>
       <div class="form-group"><label>HSD Price (₹/L)</label><input id="sHSD" type="number" step="0.01" value="${s.hsd_price||90}"/></div>
       <div class="form-group"><label>CNG Price (₹/L)</label><input id="sCNG" type="number" step="0.01" value="${s.cng_price||85}"/></div>
+      <div class="form-group"><label>XP Premium Price (₹/L)</label><input id="sXP" type="number" step="0.01" value="${s.xp_price||110}"/></div>
       <div class="form-group"><label>Idle Timeout (minutes)</label><input id="sIdle" type="number" value="${s.idle_timeout||15}"/></div>
       <div class="form-group"><label>GSTIN</label><input id="sGST" value="${s.gstin||''}"/></div>
       <div class="form-group"><label>Address</label><input id="sAddr" value="${s.address||''}"/></div>
@@ -3020,10 +3026,10 @@ async function showSettings(activeTab){
 }
 
 async function saveSettings(){
-  const body={stationName:document.getElementById('sName').value,msPrice:parseFloat(document.getElementById('sMS').value),hsdPrice:parseFloat(document.getElementById('sHSD').value),cngPrice:parseFloat(document.getElementById('sCNG').value),idleTimeout:parseInt(document.getElementById('sIdle').value),gstin:document.getElementById('sGST').value,address:document.getElementById('sAddr').value,mobile:document.getElementById('sMob').value};
+  const body={stationName:document.getElementById('sName').value,msPrice:parseFloat(document.getElementById('sMS').value),hsdPrice:parseFloat(document.getElementById('sHSD').value),cngPrice:parseFloat(document.getElementById('sCNG').value),xpPrice:parseFloat(document.getElementById('sXP').value),idleTimeout:parseInt(document.getElementById('sIdle').value),gstin:document.getElementById('sGST').value,address:document.getElementById('sAddr').value,mobile:document.getElementById('sMob').value};
   const res=await apiFetch('/api/settings',{method:'PUT',body});
   const data=await res.json(); if(!res.ok)return showToast(data.error,'error');
-  if(currentStation){currentStation.msPrice=body.msPrice;currentStation.hsdPrice=body.hsdPrice;currentStation.cngPrice=body.cngPrice;}
+  if(currentStation){currentStation.msPrice=body.msPrice;currentStation.hsdPrice=body.hsdPrice;currentStation.cngPrice=body.cngPrice;currentStation.xpPrice=body.xpPrice;}
   showToast('✓ Settings saved','success');
 }
 async function showAuditLog(){
@@ -3313,7 +3319,7 @@ async function showVehicleReport(fromVal, toVal, vehicleNo='', fuelType='') {
       <div class="form-group" style="flex:1;min-width:140px"><label>Vehicle No</label><input id="vrVno" value="${vehicleNo}" placeholder="e.g. KA01" style="text-transform:uppercase"/></div>
       <div class="form-group" style="flex:1;min-width:100px"><label>Fuel</label>
         <select id="vrFuel" onchange="showVehicleReport(document.getElementById('vrFrom').value,document.getElementById('vrTo').value,document.getElementById('vrVno').value,this.value)">
-          <option value="">All</option><option value="MS" ${fuelType==='MS'?'selected':''}>MS</option><option value="HSD" ${fuelType==='HSD'?'selected':''}>HSD</option>
+          <option value="">All</option><option value="MS" ${fuelType==='MS'?'selected':''}>MS</option><option value="HSD" ${fuelType==='HSD'?'selected':''}>HSD</option><option value="XP" ${fuelType==='XP'?'selected':''}>XP Premium</option>
         </select></div>
       <div style="align-self:flex-end;padding-bottom:2px">
         <button class="btn-sm" style="background:var(--accent);color:#000;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:700" onclick="showVehicleReport(document.getElementById('vrFrom').value,document.getElementById('vrTo').value,document.getElementById('vrVno').value,document.getElementById('vrFuel').value)">Search</button>

@@ -61,6 +61,7 @@ async function initSchema() {
       ms_price REAL NOT NULL DEFAULT 102.00,
       hsd_price REAL NOT NULL DEFAULT 90.00,
       cng_price REAL NOT NULL DEFAULT 85.00,
+      xp_price REAL NOT NULL DEFAULT 110.00,
       idle_timeout INTEGER NOT NULL DEFAULT 15,
       plan TEXT NOT NULL DEFAULT 'trial' CHECK(plan IN ('trial','basic','pro','enterprise')),
       is_active INTEGER NOT NULL DEFAULT 1,
@@ -111,7 +112,7 @@ async function initSchema() {
     `CREATE TABLE IF NOT EXISTS tanks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
-      tank_name TEXT NOT NULL, fuel_type TEXT NOT NULL CHECK(fuel_type IN ('MS','HSD','CNG')),
+      tank_name TEXT NOT NULL, fuel_type TEXT NOT NULL CHECK(fuel_type IN ('MS','HSD','CNG','XP')),
       display_name TEXT,
       capacity REAL NOT NULL, current_stock REAL NOT NULL DEFAULT 0,
       min_alert REAL NOT NULL DEFAULT 2000, is_active INTEGER NOT NULL DEFAULT 1,
@@ -447,6 +448,7 @@ async function initSchema() {
     )`,
 
     // ── SPRINT 7: NOTIFICATION SETTINGS extra fields ──────────────────────
+    `ALTER TABLE stations ADD COLUMN xp_price REAL NOT NULL DEFAULT 110.00`,
     `ALTER TABLE notification_settings ADD COLUMN expiry_alert_enabled INTEGER NOT NULL DEFAULT 1`,
     `ALTER TABLE notification_settings ADD COLUMN expiry_alert_days INTEGER NOT NULL DEFAULT 30`,
     `ALTER TABLE notification_settings ADD COLUMN sms_enabled INTEGER NOT NULL DEFAULT 0`,
@@ -465,7 +467,7 @@ async function seedInitialData() {
     [process.env.SUPER_ADMIN_USERNAME || 'superadmin', hash, 'Super Administrator']);
 
   // Demo station
-  await db.run(`INSERT INTO stations (station_code,station_name,ms_price,hsd_price,cng_price,plan,trial_ends_at) VALUES (?,?,102,90,85,'trial',date('now','+30 days'))`,
+  await db.run(`INSERT INTO stations (station_code,station_name,ms_price,hsd_price,cng_price,xp_price,plan,trial_ends_at) VALUES (?,?,102,90,85,110,'trial',date('now','+30 days'))`,
     ['DEMO01','Demo Fuel Station']);
   const station = await db.get('SELECT id FROM stations WHERE station_code=?',['DEMO01']);
   const ownerHash = bcrypt.hashSync('Demo@12345', 12);
